@@ -51,8 +51,8 @@ project fills that gap. We are **not** copying its Chrome-extension approach —
 
 ## Targets & constraints
 
-- Target the same TFM as the consuming apps. Floor is `net8.0`; use `net10.0` if current. The RCL
-  should multi-target if needed to support both your apps.
+- Target the same TFM as the consuming apps. The RCL multi-targets `net8.0;net9.0;net10.0`; the
+  reflected internals are verified on all three by the `RuntimeInternalsTests` guard.
 - Must work, with identical code, in Blazor WASM (browser) and MAUI Blazor Hybrid (BlazorWebView).
 - No third-party runtime dependencies beyond `Microsoft.AspNetCore.Components.Web`.
 - Zero required code changes in the consumer's components for basic tracking (one DI call + one
@@ -63,50 +63,69 @@ project fills that gap. We are **not** copying its Chrome-extension approach —
 ## Repository layout
 
 ```
-/BlazorInspector            # the RCL
+/BlazorInspector                  # the RCL (multi-targets net8.0;net9.0;net10.0)
   BlazorInspector.csproj
-  InspectorCore.cs          # registry, activator, DI extension, reflection helpers
-  InspectorOverlay.razor    # floating panel UI
-  /wwwroot                  # (Phase 3) BlazorInspector.lib.module.js
+  RuntimeInternals.cs             # ALL framework-internals reflection (named, version-doc'd constants)
+  ParameterReader.cs              # safe [Parameter]/[CascadingParameter]/state reading + formatting
+  ValueReader.cs                  # expandable value tree + reflective inline-edit writes
+  InspectorRegistry.cs            # weak-ref tracking; Snapshot() and BuildTree()
+  InspectorComponentActivator.cs  # IComponentActivator that tracks instances + chains
+  ServiceCollectionExtensions.cs  # AddBlazorInspector() (DEBUG-gated)
+  InspectorOptions.cs             # corner / refresh interval / start-open
+  InspectorInterop.cs             # [JSInvokable] picker callback
+  ComponentSnapshot.cs            # ComponentNode / ParameterValue / ValueNode types
+  SourceMap.cs                    # reads the generated jump-to-code map; builds vscode:// links
+  InspectorOverlay.razor(.css)    # floating panel UI + scoped styles
+  InspectorTreeNode.razor         # recursive component-tree row
+  InspectorValueNode.razor        # recursive expandable/editable value row
+  /wwwroot                        # BlazorInspector.lib.module.js (Phase 3 picker)
+/BlazorInspector.SourceGen        # Roslyn source generator for jump-to-code (netstandard2.0)
 /samples
-  /SampleWasm               # minimal WASM app referencing the RCL (manual test harness)
-  /SampleMaui               # minimal MAUI Hybrid app referencing the RCL (manual test harness)
+  /SampleWasm                     # Blazor WASM manual test harness
+  /SampleMaui                     # MAUI Hybrid manual test harness
 /tests
-  /BlazorInspector.Tests    # bUnit + unit tests
-README.md
-SPEC.md                     # this file
+  /BlazorInspector.Tests          # xUnit + bUnit + source-generator tests (net8/9/10)
+README.md  CONTRIBUTING.md  CHANGELOG.md  LICENSE
+CLAUDE.md                         # this file (the build spec)
 ```
 
 ---
 
-## Current state
+## Current state (implemented & verified — 2026-06)
 
-A Phase 1 starter already exists (`BlazorInspector.csproj`, `InspectorCore.cs`,
-`InspectorOverlay.razor`, `README.md`). It compiles conceptually but has **not** been verified against
-a live SDK. It provides:
+All phases below are implemented and **verified live**: the xUnit/bUnit/source-generator suite passes
+on net8.0/net9.0/net10.0, and the overlay, tree, parameter/state inspection, expandable values, inline
+editing, picker highlight, and jump-to-code were exercised against the running WASM sample (via
+Playwright) and inside the MAUI BlazorWebView (via WebView2 CDP). What exists:
 
-- `InspectorRegistry` — weak-reference list of tracked instances; `Snapshot()` returns
-  `ComponentSnapshot` records (componentId + type + parameter dictionary); prunes dead refs.
+- `InspectorRegistry` — weak-reference tracking; `Snapshot()` (flat) and `BuildTree()` (parent/child
+  hierarchy from the renderer's `ComponentState` map); prunes dead refs.
 - `InspectorComponentActivator : IComponentActivator` — tracks every created instance, skips the
   inspector's own namespace, chains to an inner activator.
-- `AddBlazorInspector()` DI extension.
-- `InspectorOverlay.razor` — floating button + panel listing components with expandable parameters.
+- `ParameterReader` / `ValueReader` — safe parameter/state reading, expandable collection/dictionary/
+  object drill-down, and reflective inline editing of writable scalar leaves (force-re-renders the
+  owning component via `RuntimeInternals.TryInvokeStateHasChanged`).
+- `AddBlazorInspector()` DI extension — DEBUG-gated; a no-op in Release.
+- `InspectorOverlay.razor` (+ `InspectorTreeNode` / `InspectorValueNode`) — floating button, collapsible
+  tree, detail pane with expandable + editable values, element picker, and jump-to-code links.
+- `BlazorInspector.SourceGen` — the jump-to-code generator, packed into the package's analyzers folder.
 
-Treat this as the starting point to harden and extend, not as finished or correct.
+Beyond the original brief, the repo also has full OSS packaging (NuGet metadata, README/CONTRIBUTING/
+CHANGELOG, Apache-2.0 LICENSE) and GitHub Actions CI + NuGet-publish workflows. Extend/harden from here
+— it is finished and correct for its current scope, not a starter.
 
 ---
 
 ## STEP 0 — Verify runtime internals before anything else
 
-Everything hinges on reflecting private members whose names vary by .NET version. Before extending
-features, write a tiny probe (a throwaway page or test) that dumps the actual members so the rest of
-the work targets reality, not assumptions. Confirm specifically:
+Everything hinges on reflecting private members whose names vary by .NET version. These are now
+**confirmed for .NET 8 / 9 / 10** and recorded as named constants in `RuntimeInternals.cs`, guarded by
+`RuntimeInternalsTests.AllReflectedMembersResolve`. When bumping the TFM, re-run that test (or a tiny
+probe) to re-confirm the following before assuming anything still holds:
 
-- On `ComponentBase`: the private field holding the render handle (expected `_renderHandle`).
-- On `RenderHandle`: how the component id is stored. It is likely a **private field** `_componentId`
-  (not a property). The Phase 1 starter reflects a property named `ComponentId`; if that returns
-  null, switch to the field. Also find the internal reference to the `Renderer` (expected field
-  `_renderer`).
+- On `ComponentBase`: the private field holding the render handle — `_renderHandle`.
+- On `RenderHandle`: the component id is a **private field** `_componentId` (confirmed: a field, not a
+  property). Also the internal reference to the `Renderer` — field `_renderer`.
 - On `Renderer`: the dictionary mapping component id to component state (expected
   `_componentStateById`, a `Dictionary<int, ComponentState>`), and on `ComponentState` the members
   for component id, the component instance, and the parent state (expected `ParentComponentState`).
@@ -180,6 +199,13 @@ sends the matched componentId back to .NET (`DotNet.invokeMethodAsync`) to selec
 Verify the JS initializer fires inside the MAUI BlazorWebView, not just in WASM; if it doesn't,
 fall back to registering the module via the host page for MAUI.
 
+**Status (verified):** the JS initializer *does* fire inside the MAUI BlazorWebView on .NET 10 — no
+host-page fallback needed. Hover-highlight works in both targets. **Click-to-select is not achievable
+on current Blazor WASM:** the runtime hands `renderBatch` an opaque WASM-memory pointer (not a readable
+batch object), so a DOM↔componentId map can't be built from JS — the picker ships **highlight-only** and
+logs a one-time note on click. The hook is installed in a `beforeStart` initializer (wrapping
+`renderBatch` in `afterStarted` is too late — the JSImport is already bound). See README "Limitations".
+
 ### 3b. Jump-to-code (introduces a source generator)
 
 Add a Roslyn source generator (`IIncrementalGenerator`) that maps each component type to its `.razor`
@@ -188,6 +214,12 @@ name ↔ file name, namespace ↔ folder), and emit a static `Dictionary<Type, (
 Handle code-behind/partial cases by also honoring `#line` directives in the Razor-generated output if
 the convention mapping misses. The overlay renders a `vscode://file/{absolutePath}:{line}` link per
 component, which opens VS Code locally.
+
+**Status (implemented):** the generator maps `.razor` `AdditionalFiles` to type names honoring per-file
+`@namespace` directives and `_Imports.razor` inheritance, then the RootNamespace + folder convention.
+The `#line`-from-generated-output route is **not reachable** — source generators can't see each other's
+output within one compilation, so this generator never sees the Razor-generated classes; `@namespace`
+parsing is the equivalent fix for the cases the plain convention misses.
 
 Acceptance:
 - Picker: hovering the page highlights the component under the cursor in both targets; clicking
