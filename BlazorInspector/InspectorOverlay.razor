@@ -1,0 +1,370 @@
+@implements IAsyncDisposable
+@inject InspectorRegistry Registry
+@inject InspectorOptions Options
+@inject IJSRuntime JS
+
+@*
+   The overlay renders only when Options.Enabled is true. AddBlazorInspector sets Enabled=false in
+   Release, so the overlay is invisible and runs no reflection there even if the tag is left in.
+   NOTE: C# #if directives must NOT be used in Razor markup — they render as literal text. Gating is
+   done with this plain @if on a runtime flag instead.
+*@
+
+@if (Options.Enabled)
+{
+    <div class="bi-root bi-@CornerClass">
+        @if (_open)
+        {
+            <div class="bi-panel" role="dialog" aria-label="Blazor Inspector">
+                <div class="bi-header">
+                    <span class="bi-title">Blazor Inspector</span>
+                    <span class="bi-badge" title="Live components">@_count</span>
+                    <span class="bi-spacer"></span>
+                    <button class="bi-iconbtn @(_pickerActive ? "bi-active" : "")" title="Pick element" @onclick="TogglePicker">⌖</button>
+                    <button class="bi-iconbtn" title="Refresh" @onclick="Refresh">⟳</button>
+                    <button class="bi-iconbtn" title="Close" @onclick="Close">✕</button>
+                </div>
+
+                <div class="bi-tree">
+                    @if (_roots.Count == 0)
+                    {
+                        <div class="bi-empty">No components tracked yet.</div>
+                    }
+                    else
+                    {
+                        @foreach (var node in _roots)
+                        {
+                            <InspectorTreeNode Node="node"
+                                               Depth="0"
+                                               Expanded="_expanded"
+                                               SelectedId="_selected?.ComponentId"
+                                               SourceLink="SourceLinkFor"
+                                               OnSelect="Select"
+                                               OnToggle="ToggleExpand" />
+                        }
+                    }
+                </div>
+
+                @if (_selected is not null)
+                {
+                    <div class="bi-detail">
+                        <div class="bi-detail-head">
+                            <span class="bi-detail-name">@_selected.DisplayName</span>
+                            <span class="bi-detail-id">#@_selected.ComponentId</span>
+                            @if (SourceLinkFor(_selected) is { } link)
+                            {
+                                <a class="bi-source" href="@link" title="@link">&lt;/&gt; source</a>
+                            }
+                        </div>
+                        @{
+                            var (paramNodes, stateNodes) = SelectedValueNodes();
+                        }
+                        @if (paramNodes.Count == 0 && stateNodes.Count == 0)
+                        {
+                            <div class="bi-empty">No parameters or state.</div>
+                        }
+                        else
+                        {
+                            @if (paramNodes.Count > 0)
+                            {
+                                <div class="bi-section">Parameters</div>
+                                <div class="bi-values">
+                                    @foreach (var n in paramNodes)
+                                    {
+                                        <InspectorValueNode Node="n" Expanded="_expandedValues" OnToggle="ToggleValue"
+                                                            EditingPath="@_editingPath" EditError="@_editError"
+                                                            OnBeginEdit="BeginEdit" OnCommitEdit="CommitEdit" OnCancelEdit="CancelEdit" />
+                                    }
+                                </div>
+                            }
+                            @if (stateNodes.Count > 0)
+                            {
+                                <div class="bi-section">State</div>
+                                <div class="bi-values">
+                                    @foreach (var n in stateNodes)
+                                    {
+                                        <InspectorValueNode Node="n" Expanded="_expandedValues" OnToggle="ToggleValue"
+                                                            EditingPath="@_editingPath" EditError="@_editError"
+                                                            OnBeginEdit="BeginEdit" OnCommitEdit="CommitEdit" OnCancelEdit="CancelEdit" />
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        <button class="bi-fab" title="Blazor Inspector" @onclick="Toggle">@(_open ? "✕" : "🔍")</button>
+    </div>
+}
+
+@code {
+    private bool _open;
+    private bool _pickerActive;
+    private int _count;
+    private IReadOnlyList<ComponentNode> _roots = Array.Empty<ComponentNode>();
+    private readonly HashSet<int> _expanded = new();
+    private readonly HashSet<string> _expandedValues = new();
+    private ComponentNode? _selected;
+    private string? _editingPath;
+    private string? _editError;
+
+    private PeriodicTimer? _timer;
+    private CancellationTokenSource? _cts;
+
+    private string CornerClass => Options.Corner switch
+    {
+        InspectorCorner.BottomLeft => "bottom-left",
+        InspectorCorner.TopRight => "top-right",
+        InspectorCorner.TopLeft => "top-left",
+        _ => "bottom-right",
+    };
+
+    protected override void OnInitialized()
+    {
+        if (!Options.Enabled)
+            return;
+
+        InspectorInterop.Picked += OnPicked;
+        if (Options.StartOpen)
+            _ = OpenAsync();
+    }
+
+    private void Toggle()
+    {
+        if (_open)
+            Close();
+        else
+            _ = OpenAsync();
+    }
+
+    private Task OpenAsync()
+    {
+        _open = true;
+        Refresh();
+        StartTimer();
+        return Task.CompletedTask;
+    }
+
+    private void Close()
+    {
+        _open = false;
+        _ = SetPickerAsync(false);
+        StopTimer();
+    }
+
+    private void Refresh()
+    {
+        try
+        {
+            _roots = Registry.BuildTree();
+            _count = Registry.Count;
+            RebindSelection();
+        }
+        catch
+        {
+            // The inspector must never throw into the host.
+        }
+    }
+
+    // Re-resolve the selected node by id after a refresh so the detail pane tracks live data.
+    private void RebindSelection()
+    {
+        if (_selected is null)
+            return;
+        _selected = FindById(_roots, _selected.ComponentId);
+    }
+
+    private static ComponentNode? FindById(IEnumerable<ComponentNode> nodes, int id)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.ComponentId == id)
+                return node;
+            var found = FindById(node.Children, id);
+            if (found is not null)
+                return found;
+        }
+        return null;
+    }
+
+    private void Select(ComponentNode node)
+    {
+        if (_selected?.ComponentId != node.ComponentId)
+            _expandedValues.Clear(); // value-expansion paths are component-relative
+        _selected = node;
+    }
+
+    private void ToggleExpand(ComponentNode node)
+    {
+        if (!_expanded.Remove(node.ComponentId))
+            _expanded.Add(node.ComponentId);
+    }
+
+    // Build the expandable parameter/state value trees for the selected component, on demand.
+    private (IReadOnlyList<ValueNode> Parameters, IReadOnlyList<ValueNode> State) SelectedValueNodes()
+    {
+        if (_selected is null)
+            return (Array.Empty<ValueNode>(), Array.Empty<ValueNode>());
+
+        if (_selected.Instance is { } instance)
+        {
+            try { return ValueReader.BuildRoots(instance, _expandedValues); }
+            catch { /* never throw into the host; fall back to the flat summaries below */ }
+        }
+
+        return (ToLeafNodes(_selected.Parameters, "P:"), ToLeafNodes(_selected.State, "S:"));
+    }
+
+    private static IReadOnlyList<ValueNode> ToLeafNodes(IReadOnlyList<ParameterValue> values, string prefix) =>
+        values.Select(v => new ValueNode
+        {
+            Name = v.Name, Kind = v.Kind, Display = v.Value, Path = prefix + v.Name, Expandable = false,
+        }).ToList();
+
+    private void ToggleValue(string path)
+    {
+        if (!_expandedValues.Remove(path))
+            _expandedValues.Add(path);
+        StateHasChanged();
+    }
+
+    private void BeginEdit(ValueNode node)
+    {
+        _editingPath = node.Path;
+        _editError = null;
+    }
+
+    private void CancelEdit()
+    {
+        _editingPath = null;
+        _editError = null;
+    }
+
+    // Write the edited value to the live instance, then re-render the owning component so the host UI
+    // (e.g. a table bound to the edited collection) reflects the change.
+    private void CommitEdit((string Path, string Value) edit)
+    {
+        if (_editingPath is null)
+            return; // already committed/cancelled (e.g. a trailing blur)
+        if (_selected?.Instance is not { } instance)
+        {
+            CancelEdit();
+            return;
+        }
+
+        var (ok, error) = ValueReader.TrySetValue(instance, edit.Path, edit.Value);
+        if (!ok)
+        {
+            _editError = error ?? "invalid value";
+            return; // stay in edit mode so the user can correct the input
+        }
+
+        RuntimeInternals.TryInvokeStateHasChanged(instance);
+        _editingPath = null;
+        _editError = null;
+        Refresh();
+    }
+
+    private async Task TogglePicker()
+    {
+        _pickerActive = !_pickerActive;
+        await SetPickerAsync(_pickerActive);
+    }
+
+    private async Task SetPickerAsync(bool enabled)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("blazorInspector.setPickerEnabled", enabled);
+        }
+        catch
+        {
+            // JS module may be unavailable (e.g. MAUI without the host-page fallback). Degrade silently.
+            _pickerActive = false;
+        }
+    }
+
+    private void OnPicked(int componentId)
+    {
+        _ = InvokeAsync(() =>
+        {
+            _pickerActive = false;
+            _ = SetPickerAsync(false);
+            Refresh();
+            var node = FindById(_roots, componentId);
+            if (node is not null)
+            {
+                if (_selected?.ComponentId != node.ComponentId)
+                    _expandedValues.Clear();
+                _selected = node;
+                ExpandAncestors(_roots, componentId);
+            }
+            StateHasChanged();
+        });
+    }
+
+    // Expand every ancestor of the target so the selected node is visible in the tree.
+    private bool ExpandAncestors(IEnumerable<ComponentNode> nodes, int targetId)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.ComponentId == targetId)
+                return true;
+            if (ExpandAncestors(node.Children, targetId))
+            {
+                _expanded.Add(node.ComponentId);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private string? SourceLinkFor(ComponentNode node) => SourceMap.VsCodeLink(node.FullName);
+
+    private void StartTimer()
+    {
+        StopTimer();
+        _cts = new CancellationTokenSource();
+        _timer = new PeriodicTimer(Options.RefreshInterval);
+        var token = _cts.Token;
+        var timer = _timer;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (await timer.WaitForNextTickAsync(token))
+                {
+                    await InvokeAsync(() =>
+                    {
+                        // Pause rebuilds while an edit is in progress so the input keeps focus/value.
+                        if (_editingPath is not null)
+                            return;
+                        Refresh();
+                        StateHasChanged();
+                    });
+                }
+            }
+            catch (OperationCanceledException) { /* expected on close/dispose */ }
+        }, token);
+    }
+
+    private void StopTimer()
+    {
+        _cts?.Cancel();
+        _timer?.Dispose();
+        _timer = null;
+        _cts?.Dispose();
+        _cts = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Options.Enabled)
+            InspectorInterop.Picked -= OnPicked;
+        StopTimer();
+        if (Options.Enabled)
+            await SetPickerAsync(false);
+    }
+}

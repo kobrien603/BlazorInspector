@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.8" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BlazorInspector\BlazorInspector.csproj" />
+    <!-- Analyzer references don't flow transitively through a ProjectReference, so reference the
+         source generator directly here so jump-to-code can be exercised in-repo. (For NuGet
+         consumers the generator ships inside the BlazorInspector package's analyzers folder.) -->
+    <ProjectReference Include="..\..\BlazorInspector.SourceGen\BlazorInspector.SourceGen.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- Feed .razor files to the source generator so it can map component types to source locations. -->
+  <ItemGroup>
+    <AdditionalFiles Include="**/*.razor" />
+  </ItemGroup>
+
+</Project>

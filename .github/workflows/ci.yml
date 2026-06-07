@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8 / 9 / 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      # The inspector is Debug-gated, and the tests assert the DEBUG-only activator behavior,
+      # so the suite must run in Debug. Tests multi-target net8.0/net9.0/net10.0.
+      - name: Test (Debug, net8/9/10)
+        run: dotnet test tests/BlazorInspector.Tests/BlazorInspector.Tests.csproj --verbosity normal
+
+      # Verify the Release path still compiles (the inspector must no-op cleanly in Release).
+      - name: Verify Release build
+        run: dotnet build BlazorInspector/BlazorInspector.csproj -c Release
+
+      # Build the WASM sample to exercise the consumer integration + source-generator wiring.
+      - name: Build WASM sample
+        run: dotnet build samples/SampleWasm/SampleWasm.csproj
+
+      # Confirm the package (incl. the packed source generator) produces cleanly.
+      - name: Pack (validation only)
+        run: dotnet pack BlazorInspector/BlazorInspector.csproj -c Release -o artifacts

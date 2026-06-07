@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Packaging (Apache-2.0 to match the ecosystem norm) -->
+    <PackageId>BlazorInspector</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>kobrien603</Authors>
+    <Description>In-app Vue/React-DevTools-style component inspector for Blazor WebAssembly and MAUI Blazor Hybrid. Browse the live component tree, inspect and edit parameters/state, and jump to .razor source. Debug-only.</Description>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <Copyright>Copyright (c) kobrien603</Copyright>
+    <PackageTags>blazor;wasm;webassembly;maui;blazor-hybrid;devtools;inspector;debugging;diagnostics</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/kobrien603/BlazorInspector</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/kobrien603/BlazorInspector.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- The inspector reflects over framework internals; that is expected. Silence the warnings. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- Ship the repo README on the NuGet package page. -->
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="BlazorInspector.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- Reference the source generator so it runs in *this* project's build and (via the pack target
+       below) ships with the package. ReferenceOutputAssembly=false: it's a build-time analyzer only. -->
+  <ItemGroup>
+    <ProjectReference Include="..\BlazorInspector.SourceGen\BlazorInspector.SourceGen.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- Pack the source generator into analyzers/dotnet/cs so jump-to-code works for NuGet consumers
+       (a plain Analyzer ProjectReference does NOT flow into the package). -->
+  <ItemGroup>
+    <None Include="..\BlazorInspector.SourceGen\bin\$(Configuration)\netstandard2.0\BlazorInspector.SourceGen.dll"
+          Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/SampleMaui/SampleMaui.csproj" />
+    <Project Path="samples/SampleWasm/SampleWasm.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BlazorInspector.Tests/BlazorInspector.Tests.csproj" />
+  </Folder>
+  <Project Path="BlazorInspector.SourceGen/BlazorInspector.SourceGen.csproj" />
+  <Project Path="BlazorInspector/BlazorInspector.csproj" />
+</Solution>

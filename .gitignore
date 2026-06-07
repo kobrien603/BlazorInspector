@@ -1,0 +1,22 @@
+## .NET / Visual Studio
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+.vs/
+.vscode/
+
+## MAUI / build artifacts
+[Bb]in/
+[Oo]bj/
+*.binlog
+artifacts/
+
+## Generated-files emission (used during verification)
+**/generated/
+
+## Rider / others
+.idea/
+*.DotSettings.user

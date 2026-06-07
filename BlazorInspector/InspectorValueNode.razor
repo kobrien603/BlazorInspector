@@ -1,0 +1,92 @@
+@* One row of an expandable parameter/state value; recurses into its children when expanded, and
+   edits writable scalar leaves in place. DEBUG-only, in the BlazorInspector namespace so the
+   activator never tracks it. *@
+@using Microsoft.AspNetCore.Components.Web
+
+<div class="bi-vnode">
+    <div class="bi-vrow" style="padding-left:@(Depth * 14 + 10)px" @onclick="Toggle">
+        @if (Node.Expandable)
+        {
+            <span class="bi-chevron">@(IsExpanded ? "▾" : "▸")</span>
+        }
+        else
+        {
+            <span class="bi-chevron bi-leaf"></span>
+        }
+        <span class="bi-vname" title="@Node.Kind">@Node.Name</span>
+        <span class="bi-vsep">:</span>
+        @if (_editingThis)
+        {
+            <input class="bi-vedit @(string.IsNullOrEmpty(EditError) ? "" : "bi-vedit-error")"
+                   value="@_buffer" autofocus
+                   @oninput="OnInput" @onkeydown="OnKey" @onblur="OnCancelEdit"
+                   @onclick:stopPropagation="true" />
+            @if (!string.IsNullOrEmpty(EditError))
+            {
+                <span class="bi-verror" title="@EditError">⚠</span>
+            }
+        }
+        else if (Node.Editable)
+        {
+            <span class="bi-vval bi-veditable" title="Click to edit"
+                  @onclick:stopPropagation="true" @onclick="Begin">@Node.Display</span>
+        }
+        else
+        {
+            @* Non-editable: let the click bubble to the row so it still toggles expansion. *@
+            <span class="bi-vval">@Node.Display</span>
+        }
+    </div>
+
+    @if (IsExpanded)
+    {
+        @foreach (var child in Node.Children)
+        {
+            <InspectorValueNode Node="child" Depth="Depth + 1" Expanded="Expanded" OnToggle="OnToggle"
+                                EditingPath="@EditingPath" EditError="@EditError"
+                                OnBeginEdit="OnBeginEdit" OnCommitEdit="OnCommitEdit" OnCancelEdit="OnCancelEdit" />
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required ValueNode Node { get; set; }
+    [Parameter] public int Depth { get; set; }
+    [Parameter, EditorRequired] public required HashSet<string> Expanded { get; set; }
+    [Parameter] public EventCallback<string> OnToggle { get; set; }
+
+    // Editing wiring (threaded through the whole subtree; only the matching node renders an editor).
+    [Parameter] public string? EditingPath { get; set; }
+    [Parameter] public string? EditError { get; set; }
+    [Parameter] public EventCallback<ValueNode> OnBeginEdit { get; set; }
+    [Parameter] public EventCallback<(string Path, string Value)> OnCommitEdit { get; set; }
+    [Parameter] public EventCallback OnCancelEdit { get; set; }
+
+    private string _buffer = "";
+    private bool _wasEditing;
+
+    private bool IsExpanded => Node.Expandable && Expanded.Contains(Node.Path);
+    private bool _editingThis => EditingPath == Node.Path;
+
+    protected override void OnParametersSet()
+    {
+        // Seed the local edit buffer once, when this node enters edit mode.
+        if (_editingThis && !_wasEditing)
+            _buffer = Node.EditText;
+        _wasEditing = _editingThis;
+    }
+
+    private Task Toggle() => Node.Expandable ? OnToggle.InvokeAsync(Node.Path) : Task.CompletedTask;
+
+    private Task Begin() => Node.Editable ? OnBeginEdit.InvokeAsync(Node) : Task.CompletedTask;
+
+    private void OnInput(ChangeEventArgs e) => _buffer = e.Value?.ToString() ?? "";
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await OnCommitEdit.InvokeAsync((Node.Path, _buffer));
+        else if (e.Key == "Escape")
+            await OnCancelEdit.InvokeAsync();
+    }
+}

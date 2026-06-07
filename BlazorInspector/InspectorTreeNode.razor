@@ -1,0 +1,47 @@
+@* One row of the component tree; recurses into its children when expanded. DEBUG-only, in the
+   BlazorInspector namespace so the activator never tracks it. *@
+
+<div class="bi-node">
+    <div class="bi-row @(SelectedId == Node.ComponentId ? "bi-selected" : "")"
+         style="padding-left:@(Depth * 14 + 6)px"
+         @onclick="() => OnSelect.InvokeAsync(Node)">
+        @if (Node.Children.Count > 0)
+        {
+            <span class="bi-chevron" @onclick:stopPropagation="true" @onclick="() => OnToggle.InvokeAsync(Node)">
+                @(IsExpanded ? "▾" : "▸")
+            </span>
+        }
+        else
+        {
+            <span class="bi-chevron bi-leaf"></span>
+        }
+        <span class="bi-nodename">@Node.DisplayName</span>
+        <span class="bi-nodeid">#@Node.ComponentId</span>
+    </div>
+
+    @if (IsExpanded)
+    {
+        @foreach (var child in Node.Children)
+        {
+            <InspectorTreeNode Node="child"
+                               Depth="Depth + 1"
+                               Expanded="Expanded"
+                               SelectedId="SelectedId"
+                               SourceLink="SourceLink"
+                               OnSelect="OnSelect"
+                               OnToggle="OnToggle" />
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required ComponentNode Node { get; set; }
+    [Parameter] public int Depth { get; set; }
+    [Parameter, EditorRequired] public required HashSet<int> Expanded { get; set; }
+    [Parameter] public int? SelectedId { get; set; }
+    [Parameter] public Func<ComponentNode, string?>? SourceLink { get; set; }
+    [Parameter] public EventCallback<ComponentNode> OnSelect { get; set; }
+    [Parameter] public EventCallback<ComponentNode> OnToggle { get; set; }
+
+    private bool IsExpanded => Node.Children.Count > 0 && Expanded.Contains(Node.ComponentId);
+}

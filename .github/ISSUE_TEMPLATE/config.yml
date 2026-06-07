@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question / discussion
+    url: https://github.com/kobrien603/BlazorInspector/discussions
+    about: Ask a question or discuss an idea before opening an issue.

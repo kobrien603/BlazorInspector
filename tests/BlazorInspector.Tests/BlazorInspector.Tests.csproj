@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- The fakes intentionally read/set component parameters directly to exercise the reader. -->
+    <NoWarn>$(NoWarn);BL0005;BL0007</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="bunit" Version="1.40.0" />
+    <!-- Drives the source generator in-process for ComponentSourceMapGeneratorTests. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BlazorInspector\BlazorInspector.csproj" />
+    <!-- Referenced for assembly access (not as an analyzer) so the generator can be unit-tested. -->
+    <ProjectReference Include="..\..\BlazorInspector.SourceGen\BlazorInspector.SourceGen.csproj" />
+  </ItemGroup>
+
+</Project>
