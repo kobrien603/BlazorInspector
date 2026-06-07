@@ -193,5 +193,8 @@ Copyright © kobrien603.
 
 ## Acknowledgements
 
-Fills the WASM/MAUI gap left by the excellent **BlazorDeveloperTools** (Chrome extension + NuGet
-package), which covers Server / InteractiveAuto render modes.
+Fills the WASM/MAUI gap left by the excellent
+[BlazorDeveloperTools](https://github.com/joe-gregory/blazor-devtools) by
+[@joe-gregory](https://github.com/joe-gregory) (Chrome/Edge extension + NuGet package;
+[blazordevelopertools.com](https://blazordevelopertools.com)), which covers Server / InteractiveAuto
+render modes.
