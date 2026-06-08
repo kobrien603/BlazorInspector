@@ -7,7 +7,9 @@
 [![Targets](https://img.shields.io/badge/Blazor-WASM%20%7C%20MAUI%20Hybrid-5b2dd6)](#requirements)
 
 A Vue/React-DevTools-style **in-app component inspector** for **Blazor WebAssembly** and **MAUI Blazor
-Hybrid** — the two render modes the existing `BlazorDeveloperTools` extension does not cover.
+Hybrid**. It's a focused, local debugging tool that's complementary to the more mature
+[BlazorDeveloperTools](#how-it-compares-to-blazordevelopertools) — the two cover different render
+modes (see the comparison below to pick the right one).
 
 Open a floating panel inside your running app to browse the live component tree, inspect (and edit)
 each component's parameters and state, hover the page to highlight elements, and jump straight to a
@@ -22,6 +24,7 @@ component's `.razor` source in VS Code.
 
 ## Table of contents
 
+- [How it compares to BlazorDeveloperTools](#how-it-compares-to-blazordevelopertools)
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -33,7 +36,17 @@ component's `.razor` source in VS Code.
 - [Building from source](#building-from-source)
 - [Contributing](#contributing)
 - [License](#license)
-- [Acknowledgements](#acknowledgements)
+
+## How it compares to BlazorDeveloperTools
+
+On Blazor **Server** or **InteractiveAuto**? Go use
+[**BlazorDeveloperTools**](https://github.com/joe-gregory/blazor-devtools)
+([NuGet](https://www.nuget.org/packages/BlazorDeveloperTools) ·
+[blazordevelopertools.com](https://blazordevelopertools.com)) — it's a more mature, richer DevTools
+experience (component tree, render profiler, flamegraphs) and exactly what those modes call for.
+
+BlazorInspector covers the other half: **WebAssembly** and **MAUI Blazor Hybrid**, where a browser
+DevTools extension can't reach — one in-app overlay, same behavior across both.
 
 ## Features
 
@@ -192,11 +205,3 @@ Licensed under the **Apache License 2.0** — see [LICENSE](LICENSE). It's permi
 modify, and distribute), includes an explicit patent grant, and disclaims warranty/liability.
 
 Copyright © kobrien603.
-
-## Acknowledgements
-
-Fills the WASM/MAUI gap left by the excellent
-[BlazorDeveloperTools](https://github.com/joe-gregory/blazor-devtools) by
-[@joe-gregory](https://github.com/joe-gregory) (Chrome/Edge extension + NuGet package;
-[blazordevelopertools.com](https://blazordevelopertools.com)), which covers Server / InteractiveAuto
-render modes.
