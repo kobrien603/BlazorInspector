@@ -7,9 +7,8 @@
 [![Targets](https://img.shields.io/badge/Blazor-WASM%20%7C%20MAUI%20Hybrid-5b2dd6)](#requirements)
 
 A Vue/React-DevTools-style **in-app component inspector** for **Blazor WebAssembly** and **MAUI Blazor
-Hybrid**. It's a focused, local debugging tool that's complementary to the more mature
-[BlazorDeveloperTools](#how-it-compares-to-blazordevelopertools) — the two cover different render
-modes (see the comparison below to pick the right one).
+Hybrid**. It's a small, local debugging tool I built for my own use — shared openly in case it's
+helpful to you too.
 
 Open a floating panel inside your running app to browse the live component tree, inspect (and edit)
 each component's parameters and state, hover the page to highlight elements, and jump straight to a
@@ -24,7 +23,7 @@ component's `.razor` source in VS Code.
 
 ## Table of contents
 
-- [How it compares to BlazorDeveloperTools](#how-it-compares-to-blazordevelopertools)
+- [Who it's for](#who-its-for)
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -37,16 +36,17 @@ component's `.razor` source in VS Code.
 - [Contributing](#contributing)
 - [License](#license)
 
-## How it compares to BlazorDeveloperTools
+## Who it's for
 
-On Blazor **Server** or **InteractiveAuto**? Go use
+BlazorInspector is a personal, local debugging tool — built to inspect **Blazor WebAssembly** and
+**MAUI Blazor Hybrid** apps from inside the running app. It's shared openly in case it's useful to you,
+but it's intentionally small in scope and isn't trying to be a full DevTools suite.
+
+If you want a mature, full-featured Blazor DevTools experience — a render profiler, flamegraphs, and a
+browser DevTools panel, and especially on **Server** or **InteractiveAuto** — reach for
 [**BlazorDeveloperTools**](https://github.com/joe-gregory/blazor-devtools)
 ([NuGet](https://www.nuget.org/packages/BlazorDeveloperTools) ·
-[blazordevelopertools.com](https://blazordevelopertools.com)) — it's a more mature, richer DevTools
-experience (component tree, render profiler, flamegraphs) and exactly what those modes call for.
-
-BlazorInspector covers the other half: **WebAssembly** and **MAUI Blazor Hybrid**, where a browser
-DevTools extension can't reach — one in-app overlay, same behavior across both.
+[blazordevelopertools.com](https://blazordevelopertools.com)). It's the more polished option.
 
 ## Features
 
