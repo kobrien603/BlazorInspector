@@ -39,32 +39,14 @@ component's `.razor` source in VS Code.
 
 ## How it compares to BlazorDeveloperTools
 
-BlazorInspector is **complementary to — not a replacement for —**
-[**BlazorDeveloperTools**](https://github.com/joe-gregory/blazor-devtools) by
-[@joe-gregory](https://github.com/joe-gregory), the excellent and more mature DevTools project for
-Blazor ([NuGet](https://www.nuget.org/packages/BlazorDeveloperTools) ·
-[blazordevelopertools.com](https://blazordevelopertools.com) ·
-[Chrome Web Store](https://chromewebstore.google.com/detail/blazor-developer-tools/pfddbenemjnlceffaemllejnjbobadhp)).
-The two tools cover **different render modes**, so which one you want depends on how your app runs:
+On Blazor **Server** or **InteractiveAuto**? Go use
+[**BlazorDeveloperTools**](https://github.com/joe-gregory/blazor-devtools)
+([NuGet](https://www.nuget.org/packages/BlazorDeveloperTools) ·
+[blazordevelopertools.com](https://blazordevelopertools.com)) — it's a more mature, richer DevTools
+experience (component tree, render profiler, flamegraphs) and exactly what those modes call for.
 
-| | [BlazorDeveloperTools](https://github.com/joe-gregory/blazor-devtools) | BlazorInspector (this project) |
-|---|---|---|
-| **Render modes** | Server, InteractiveServer, InteractiveAuto | WebAssembly, MAUI Blazor Hybrid |
-| **Form factor** | Chrome/Edge DevTools extension + NuGet package | In-app overlay (Razor Class Library) |
-| **Highlights** | Component tree, timeline/flamegraph profiler, "why did this render?", element picker | Component tree, parameter/state inspection, expandable + inline-editable values, hover highlight, jump-to-code |
-| **Maturity** | Mature, actively maintained, richer feature set | Focused personal/local debugging tool |
-
-**Which should you use?**
-
-- Running Blazor **Server** or **InteractiveAuto**? Use **BlazorDeveloperTools** — that's exactly what
-  it's built for, and a browser DevTools extension is the right form factor there. (It also can't load
-  into a MAUI `BlazorWebView`, which is the other half of the story.)
-- Running **WebAssembly** or **MAUI Blazor Hybrid**, where a DevTools extension can't reach into the
-  app? That's the gap **BlazorInspector** fills, with one in-app overlay that behaves identically
-  across both.
-
-This project exists because of, and was inspired by, BlazorDeveloperTools — many thanks to
-[@joe-gregory](https://github.com/joe-gregory) for building it. 🙏
+BlazorInspector covers the other half: **WebAssembly** and **MAUI Blazor Hybrid**, where a browser
+DevTools extension can't reach — one in-app overlay, same behavior across both.
 
 ## Features
 
