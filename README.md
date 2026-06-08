@@ -7,7 +7,9 @@
 [![Targets](https://img.shields.io/badge/Blazor-WASM%20%7C%20MAUI%20Hybrid-5b2dd6)](#requirements)
 
 A Vue/React-DevTools-style **in-app component inspector** for **Blazor WebAssembly** and **MAUI Blazor
-Hybrid** — the two render modes the existing `BlazorDeveloperTools` extension does not cover.
+Hybrid**. It's a focused, local debugging tool that's complementary to the more mature
+[BlazorDeveloperTools](#how-it-compares-to-blazordevelopertools) — the two cover different render
+modes (see the comparison below to pick the right one).
 
 Open a floating panel inside your running app to browse the live component tree, inspect (and edit)
 each component's parameters and state, hover the page to highlight elements, and jump straight to a
@@ -22,6 +24,7 @@ component's `.razor` source in VS Code.
 
 ## Table of contents
 
+- [How it compares to BlazorDeveloperTools](#how-it-compares-to-blazordevelopertools)
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -33,7 +36,35 @@ component's `.razor` source in VS Code.
 - [Building from source](#building-from-source)
 - [Contributing](#contributing)
 - [License](#license)
-- [Acknowledgements](#acknowledgements)
+
+## How it compares to BlazorDeveloperTools
+
+BlazorInspector is **complementary to — not a replacement for —**
+[**BlazorDeveloperTools**](https://github.com/joe-gregory/blazor-devtools) by
+[@joe-gregory](https://github.com/joe-gregory), the excellent and more mature DevTools project for
+Blazor ([NuGet](https://www.nuget.org/packages/BlazorDeveloperTools) ·
+[blazordevelopertools.com](https://blazordevelopertools.com) ·
+[Chrome Web Store](https://chromewebstore.google.com/detail/blazor-developer-tools/pfddbenemjnlceffaemllejnjbobadhp)).
+The two tools cover **different render modes**, so which one you want depends on how your app runs:
+
+| | [BlazorDeveloperTools](https://github.com/joe-gregory/blazor-devtools) | BlazorInspector (this project) |
+|---|---|---|
+| **Render modes** | Server, InteractiveServer, InteractiveAuto | WebAssembly, MAUI Blazor Hybrid |
+| **Form factor** | Chrome/Edge DevTools extension + NuGet package | In-app overlay (Razor Class Library) |
+| **Highlights** | Component tree, timeline/flamegraph profiler, "why did this render?", element picker | Component tree, parameter/state inspection, expandable + inline-editable values, hover highlight, jump-to-code |
+| **Maturity** | Mature, actively maintained, richer feature set | Focused personal/local debugging tool |
+
+**Which should you use?**
+
+- Running Blazor **Server** or **InteractiveAuto**? Use **BlazorDeveloperTools** — that's exactly what
+  it's built for, and a browser DevTools extension is the right form factor there. (It also can't load
+  into a MAUI `BlazorWebView`, which is the other half of the story.)
+- Running **WebAssembly** or **MAUI Blazor Hybrid**, where a DevTools extension can't reach into the
+  app? That's the gap **BlazorInspector** fills, with one in-app overlay that behaves identically
+  across both.
+
+This project exists because of, and was inspired by, BlazorDeveloperTools — many thanks to
+[@joe-gregory](https://github.com/joe-gregory) for building it. 🙏
 
 ## Features
 
@@ -192,11 +223,3 @@ Licensed under the **Apache License 2.0** — see [LICENSE](LICENSE). It's permi
 modify, and distribute), includes an explicit patent grant, and disclaims warranty/liability.
 
 Copyright © kobrien603.
-
-## Acknowledgements
-
-Fills the WASM/MAUI gap left by the excellent
-[BlazorDeveloperTools](https://github.com/joe-gregory/blazor-devtools) by
-[@joe-gregory](https://github.com/joe-gregory) (Chrome/Edge extension + NuGet package;
-[blazordevelopertools.com](https://blazordevelopertools.com)), which covers Server / InteractiveAuto
-render modes.
