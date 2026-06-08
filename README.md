@@ -13,6 +13,8 @@ Open a floating panel inside your running app to browse the live component tree,
 each component's parameters and state, hover the page to highlight elements, and jump straight to a
 component's `.razor` source in VS Code.
 
+![BlazorInspector demo — opening the panel, expanding the component tree, drilling into a collection, and editing a value live so the page updates instantly](docs/demo.gif)
+
 > [!IMPORTANT]
 > **Debug-only by design.** The inspector reflects over private ASP.NET Core internals — fine for a
 > local debugging tool, but can be broken by IL trimming / WASM AOT. Everything is gated behind
