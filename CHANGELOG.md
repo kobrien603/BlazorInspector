@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
-## [0.1.0] - 2026-06-07
+## [0.1.0] - 2026-06-07 — unlisted
+
+> **Unlisted on nuget.org.** This version was published before it was ready and has been pulled from
+> listings. nuget.org versions can't be deleted, so `0.1.0` is retained but hidden; the same
+> functionality is re-released as `0.1.1` (see `[Unreleased]`).
 
 Initial release — an in-app, DevTools-style component inspector for Blazor WebAssembly and MAUI
 Blazor Hybrid. Debug-only; a no-op in Release.
@@ -48,5 +52,5 @@ Blazor Hybrid. Debug-only; a no-op in Release.
 - Debug-only: trimming / WASM AOT can strip the reflected members, so the inspector is disabled in
   Release builds.
 
-[Unreleased]: https://github.com/kobrien603/BlazorInspector/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/kobrien603/BlazorInspector/releases/tag/v0.1.0
+[Unreleased]: https://github.com/kobrien603/BlazorInspector/commits/main
+[0.1.0]: https://www.nuget.org/packages/BlazorInspector/0.1.0

@@ -8,7 +8,7 @@
 
     <!-- Packaging (Apache-2.0 to match the ecosystem norm) -->
     <PackageId>BlazorInspector</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Authors>kobrien603</Authors>
     <Description>In-app Vue/React-DevTools-style component inspector for Blazor WebAssembly and MAUI Blazor Hybrid. Browse the live component tree, inspect and edit parameters/state, and jump to .razor source. Debug-only.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
