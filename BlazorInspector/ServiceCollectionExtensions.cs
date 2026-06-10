@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Reflection;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,8 +16,9 @@ public static class ServiceCollectionExtensions
     /// <see cref="IComponentActivator"/> that wraps any previously-registered one and tracks every
     /// component instance.
     ///
-    /// DEBUG-ONLY: in Release builds this is a no-op. The inspector reflects over private framework
-    /// internals that IL trimming / WASM AOT can strip, so it must never ship enabled in Release.
+    /// The overlay enables itself only when the <em>consuming app</em> was built in Debug (see
+    /// <c>Options.Enabled</c>); in a Release app it stays dormant and runs none of the framework-internals
+    /// reflection that IL trimming / WASM AOT can strip.
     /// </summary>
     public static IServiceCollection AddBlazorInspector(this IServiceCollection services) =>
         services.AddBlazorInspector(static _ => { });
@@ -23,20 +26,23 @@ public static class ServiceCollectionExtensions
     /// <inheritdoc cref="AddBlazorInspector(IServiceCollection)"/>
     public static IServiceCollection AddBlazorInspector(this IServiceCollection services, Action<InspectorOptions> configure)
     {
-        var options = new InspectorOptions();
+        // Enable by default only when the CONSUMING app was built in Debug. This MUST be a runtime check on
+        // the entry assembly, never an `#if DEBUG` in this library: a library's `#if DEBUG` is evaluated when
+        // the library itself is compiled — and the NuGet package is built in Release — so a compile-time gate
+        // here would strip the inspector out of the shipped package and leave it permanently dormant in every
+        // consumer, regardless of how the consumer is built. The explicit Enabled option still overrides this.
+        var options = new InspectorOptions { Enabled = EntryAssemblyBuiltInDebug() };
         configure(options);
 
-        // The registry and options are always registered so the overlay can resolve them with a plain
-        // [Inject] and never throw — but the overlay only goes live when Options.Enabled is true.
-#if !DEBUG
-        options.Enabled = false; // Release: dormant. No tracking activator is registered below either.
-#endif
+        // Registry and options are always registered so the overlay can resolve them with a plain [Inject]
+        // and never throw — the overlay itself only goes live when Options.Enabled is true.
         services.AddSingleton(options);
         services.AddSingleton<InspectorRegistry>();
 
-#if DEBUG
-        // Capture whatever activator was registered before us (bUnit's, the framework default, etc.)
-        // and wrap it. We register unconditionally so a later framework TryAddSingleton is a no-op.
+        // Capture whatever activator was registered before us (bUnit's, the framework default, etc.) and
+        // wrap it. Registered unconditionally so a later framework TryAddSingleton is a no-op. The wrapper
+        // only does cheap weak-reference tracking on the creation path; it runs no framework-internals
+        // reflection, so it is inert (beyond the tracking list) in a Release app where Enabled is false.
         var existing = services.LastOrDefault(s => s.ServiceType == typeof(IComponentActivator));
         if (existing is not null)
             services.Remove(existing);
@@ -47,11 +53,30 @@ public static class ServiceCollectionExtensions
             var inner = existing is not null ? Materialize(existing, sp) as IComponentActivator : null;
             return new InspectorComponentActivator(inner, registry);
         });
-#endif
+
         return services;
     }
 
-#if DEBUG
+    /// <summary>
+    /// True when the entry (consuming app) assembly was compiled in Debug. The C# compiler emits a
+    /// <see cref="DebuggableAttribute"/> with JIT tracking enabled / optimizations disabled for Debug builds
+    /// and omits that flag for Release builds, so this distinguishes a Debug consumer from a Release one at
+    /// runtime — exactly the signal a library cannot get from its own <c>#if DEBUG</c>.
+    /// </summary>
+    private static bool EntryAssemblyBuiltInDebug()
+    {
+        try
+        {
+            var entry = Assembly.GetEntryAssembly();
+            var attr = entry?.GetCustomAttribute<DebuggableAttribute>();
+            return attr is not null && attr.IsJITTrackingEnabled;
+        }
+        catch
+        {
+            return false; // Unknown host: stay dormant rather than risk running live in a Release app.
+        }
+    }
+
     /// <summary>Builds the service described by an existing descriptor (instance / factory / type).</summary>
     private static object? Materialize(ServiceDescriptor descriptor, IServiceProvider provider)
     {
@@ -63,5 +88,4 @@ public static class ServiceCollectionExtensions
             return ActivatorUtilities.CreateInstance(provider, descriptor.ImplementationType);
         return null;
     }
-#endif
 }

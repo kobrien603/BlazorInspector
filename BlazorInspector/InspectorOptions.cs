@@ -13,8 +13,10 @@ public enum InspectorCorner
 public sealed class InspectorOptions
 {
     /// <summary>
-    /// Whether the overlay is live. Set true in DEBUG by <c>AddBlazorInspector</c> and false in Release,
-    /// so the overlay renders nothing (and runs no reflection) in Release even if the tag is left in.
+    /// Whether the overlay is live. <c>AddBlazorInspector</c> defaults this to true when the consuming app
+    /// was built in Debug and false when it was built in Release (detected at runtime from the entry
+    /// assembly), so the overlay renders nothing — and runs no reflection — in a Release app even if the tag
+    /// is left in. Set it explicitly in <c>AddBlazorInspector(o =&gt; o.Enabled = ...)</c> to override.
     /// </summary>
     public bool Enabled { get; set; } = true;
 

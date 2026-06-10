@@ -18,8 +18,10 @@ component's `.razor` source in VS Code.
 
 > [!IMPORTANT]
 > **Debug-only by design.** The inspector reflects over private ASP.NET Core internals — fine for a
-> local debugging tool, but can be broken by IL trimming / WASM AOT. Everything is gated behind
-> `#if DEBUG` and is a **no-op in Release builds**. Don't ship it enabled.
+> local debugging tool, but can be broken by IL trimming / WASM AOT. It enables itself automatically
+> **only when your app is built in Debug** (detected at runtime) and is a **no-op when your app is built
+> in Release**, so it's safe to leave the registration and `<InspectorOverlay />` tag in place. Don't
+> force it on in Release.
 
 ## Table of contents
 
@@ -79,7 +81,7 @@ browser DevTools panel, and especially on **Server** or **InteractiveAuto** — 
 |---|---|
 | **.NET** | 8.0, 9.0, or 10.0 (the RCL multi-targets `net8.0;net9.0;net10.0`) |
 | **Render modes** | Blazor WebAssembly, MAUI Blazor Hybrid |
-| **Build** | Debug only — the inspector compiles out / no-ops in Release |
+| **Build** | Debug only — auto-enables in a Debug build of your app, no-ops in Release |
 | **Runtime deps** | none beyond `Microsoft.AspNetCore.Components.Web` |
 
 ## Installation
@@ -99,7 +101,8 @@ dotnet add package BlazorInspector
 Two lines of integration:
 
 ```csharp
-// Program.cs (WASM) or MauiProgram.cs (MAUI) — DEBUG-only, no-op in Release.
+// Program.cs (WASM) or MauiProgram.cs (MAUI). Auto-enables when your app is built in
+// Debug; a no-op when it's built in Release — no need to wrap this in your own #if DEBUG.
 builder.Services.AddBlazorInspector();
 ```
 
@@ -164,7 +167,10 @@ re-run the test suite when bumping the target framework.
 ## Limitations & known issues
 
 - **Debug-only / Release no-op.** Trimming and WASM AOT can strip the reflected members, so the
-  inspector is intentionally disabled in Release. Don't rely on it there.
+  inspector disables itself when your app is built in Release (detected at runtime from the entry
+  assembly's `DebuggableAttribute`). Don't rely on it there. (The gate is a runtime check on *your*
+  app's build, not a compile-time `#if DEBUG` in the package — the latter would be baked in when the
+  package is compiled and could never react to how you build your app.)
 - **Element picker is highlight-only on current Blazor WASM.** Click-to-select needs to map a DOM node
   to a Blazor component id; the only JS seam for that is the render batch, but on .NET 10 WASM the
   runtime passes the batch as an opaque pointer into WASM memory, with no JS-reachable path from a

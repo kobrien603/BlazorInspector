@@ -40,9 +40,16 @@ project fills that gap. We are **not** copying its Chrome-extension approach —
    DOM injection. The activator must reproduce default creation behavior and chain to any
    pre-existing activator (e.g. bUnit's).
 
-4. **Debug-only.** The implementation reflects over private framework internals. That is acceptable
-   for a debug tool but can be broken by IL trimming / WASM AOT in Release. All registration and the
-   overlay must be gated behind `#if DEBUG` and documented as such. Never assume Release works.
+4. **Debug-only — gated on the *consumer's* build at runtime, NOT the library's `#if DEBUG`.** The
+   implementation reflects over private framework internals, which IL trimming / WASM AOT can break in
+   Release, so the overlay must stay dormant in a Release app. But the gate must be a **runtime check on
+   the consuming app's entry assembly** (`DebuggableAttribute.IsJITTrackingEnabled`), set into
+   `Options.Enabled` by `AddBlazorInspector()`. An `#if DEBUG` *inside this library* does NOT work for the
+   shipped product: a library's `#if DEBUG` is evaluated when the library is compiled — and the NuGet
+   package is built in Release — so it would strip the inspector out of the package and leave it
+   permanently dormant in every consumer. (This bit us: 0.1.x shipped dead from NuGet for exactly this
+   reason.) `#if DEBUG` is still fine in *tests/samples* and for code you never want in the package at
+   all. Never assume Release works.
 
 5. **Distributed as a Razor Class Library (RCL).** Referenced via project or NuGet by the developer's
    WASM and MAUI Hybrid apps. License: Apache-2.0 (match the ecosystem norm).
