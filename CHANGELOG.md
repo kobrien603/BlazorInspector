@@ -7,24 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.1.2] - 2026-06-12
+
+The first release that actually works when installed from NuGet — `0.1.0`/`0.1.1` shipped dead (see
+**Fixed**) — and it adds picker click-to-select on WebAssembly.
+
 ### Added
 
-- **Element picker click-to-select now works on Blazor WebAssembly.** Clicking an element in picker
-  mode selects its component in the tree (previously highlight-only). The earlier limitation held that
-  the render batch is an opaque WASM pointer with no JS-reachable path to DOM nodes — the pointer part
-  is true, but the path exists: the JS module decodes the batch through the exposed `Blazor.platform`
+- **Element picker click-to-select on Blazor WebAssembly.** Clicking an element in picker mode selects
+  its component in the tree (previously hover-highlight only). The earlier limitation held that the
+  render batch is an opaque WASM pointer with no JS-reachable path to DOM nodes — the pointer part is
+  true, but the path exists: the JS module decodes the batch through the exposed `Blazor.platform`
   memory reader (struct offsets mirror the `RenderTree` layouts, identical on .NET 8/9/10) and walks
   Blazor's logical-element tree via the DOM nodes' own Symbols to recover each component's host node.
   No public-API or .NET-side changes; degrades to hover-highlight only if the internals are
-  unavailable. Verified live against the WASM sample with Playwright.
-
-### Known limitations
-
-- Click-to-select is **Blazor WASM only**. MAUI Blazor Hybrid runs on the native runtime (no
-  `Blazor.platform` memory reader, different batch marshaling), so the picker there stays
-  hover-highlight only and the component is selected from the tree.
-
-## [0.1.2] - 2026-06-09
+  unavailable. Verified live against the WASM sample with Playwright. **WASM only** — see *Known
+  limitations*.
 
 ### Fixed
 
@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and running your app in Debug actually shows the inspector, on every supported platform.
 - A **Release consumer registers no component activator at all** (not merely a disabled one), so the
   inspector adds zero per-component overhead and keeps no tracking list there.
+
+### Known limitations
+
+- Picker **click-to-select is Blazor WASM only**. MAUI Blazor Hybrid runs on the native runtime (no
+  `Blazor.platform` memory reader, different batch marshaling), so the picker there is hover-highlight
+  only — select the component from the tree instead. See the WASM-vs-MAUI matrix in the README.
 
 ## [0.1.1] - 2026-06-07 — deprecated & unlisted
 

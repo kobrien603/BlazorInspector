@@ -225,13 +225,22 @@ function harvestBatch(ptr) {
     const uVals = range.values(updated);
     const uCount = range.count(updated);
 
-    // Collect this batch's component diffs.
+    // Collect this batch's component diffs; note whether any updated component is still unmapped.
     const diffs = [];
+    let anyUnmapped = false;
     for (let i = 0; i < uCount; i++) {
-        diffs.push(batch.updatedComponentsEntry(uVals, i));
+        const d = batch.updatedComponentsEntry(uVals, i);
+        diffs.push(d);
+        if (!idToNode.has(diff.componentId(d))) {
+            anyUnmapped = true;
+        }
     }
 
-    seedRoots(batch, diffs, diff, framesValues);
+    // Steady-state batches re-render already-mapped components — skip root seeding entirely then, so a
+    // dormant (Release) consumer pays no per-render scan. Only mounts/first-render reach seedRoots.
+    if (anyUnmapped) {
+        seedRoots(batch, diffs, diff, framesValues);
+    }
 
     // Process parents before children: a child's host node is mapped while walking its parent's
     // frames. Batches are usually ordered parent-first; a few fixpoint passes absorb any exceptions.
@@ -271,23 +280,13 @@ function harvestBatch(ptr) {
 // element rather than inserted by a parent's edits, so it can't be recovered by frame walking. Root
 // hosts are logical elements with children but no logical parent.
 function seedRoots(batch, diffs, diff, framesValues) {
-    // Free element roots: logical element, no logical parent, not yet mapped. (Comment roots such as
-    // `head::after` aren't found by querySelectorAll and carry no clickable content — ignored.)
-    const free = [];
-    for (const el of document.querySelectorAll('*')) {
-        if (SYM_CHILDREN in el && !el[SYM_PARENT] && !nodeToId.has(el)) {
-            free.push(el);
-        }
-    }
-    if (!free.length) {
-        return;
-    }
-
-    // Every componentId referenced as a child-component frame anywhere in this batch.
     const range = batch.arrayRangeReader;
     const fr = batch.frameReader;
-    const framesRange = batch.referenceFrames();
-    const frameCount = range.count(framesRange);
+    const seg = batch.arrayBuilderSegmentReader;
+
+    // Every componentId referenced as a child-component frame anywhere in this batch (cheap: scans
+    // this batch's frames, not the DOM).
+    const frameCount = range.count(batch.referenceFrames());
     const childIds = new Set();
     for (let i = 0; i < frameCount; i++) {
         const f = batch.referenceFramesEntry(framesValues, i);
@@ -296,8 +295,9 @@ function seedRoots(batch, diffs, diff, framesValues) {
         }
     }
 
-    // Unmapped roots, richest diff first (the app root builds the most; an empty head root the least).
-    const seg = batch.arrayBuilderSegmentReader;
+    // Unmapped roots = updated components never referenced as a child and not already mapped. A new
+    // child mount won't qualify (it's in childIds), so the DOM scan below runs only on real first-time
+    // roots — effectively just at app start.
     const roots = [];
     for (const d of diffs) {
         const cid = diff.componentId(d);
@@ -305,7 +305,19 @@ function seedRoots(batch, diffs, diff, framesValues) {
             roots.push({ cid, count: seg.count(diff.edits(d)) });
         }
     }
-    roots.sort((a, b) => b.count - a.count);
+    if (!roots.length) {
+        return;
+    }
+    roots.sort((a, b) => b.count - a.count); // richest diff first (app root builds most; head root least)
+
+    // Free element roots: logical element, no logical parent, not yet mapped. (Comment roots such as
+    // `head::after` aren't found by querySelectorAll and carry no clickable content — ignored.)
+    const free = [];
+    for (const el of document.querySelectorAll('*')) {
+        if (SYM_CHILDREN in el && !el[SYM_PARENT] && !nodeToId.has(el)) {
+            free.push(el);
+        }
+    }
 
     for (let i = 0; i < free.length && i < roots.length; i++) {
         mapComponent(roots[i].cid, free[i]);
