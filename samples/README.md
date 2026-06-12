@@ -46,13 +46,15 @@ Open the printed `http://localhost:<port>` URL.
       reflects the change after the auto-refresh.
 - [ ] Expand some nodes, then let it refresh — expansion and the selected node are preserved.
 
-### Phase 3a — element picker (highlight-only on current runtimes)
+### Phase 3a — element picker
 - [ ] Click the ⌖ picker button, then hover the page: the element under the cursor is highlighted.
 - [ ] Press **Esc** to cancel without picking.
-- [ ] Click an element: the highlight clears and a one-time console note explains that click-to-select
-      is unavailable on this runtime. This is expected — see the picker limitation in the root README:
-      on .NET 10 WASM the render batch is an opaque pointer, so DOM↔componentId correlation isn't
-      JS-reachable. Select components from the tree instead.
+- [ ] **(WASM) Click an element:** the highlight clears and its component is selected in the tree
+      (ancestors expanded, detail pane populated). Try a page heading, a nested layout component
+      (the nav brand → `NavMenu`), and a Counter/Weather element. The browser console logs
+      `render batch decoded via Blazor.platform; click-to-select enabled.` once.
+- [ ] **(MAUI)** Click-to-select is unavailable on the native runtime; clicking logs a one-time note
+      and you select from the tree instead (see the MAUI notes below).
 
 ### Phase 3b — jump-to-code
 - [ ] A selected node shows a `</> source` link.
@@ -75,9 +77,11 @@ before launching, then attach a CDP client (e.g. Playwright `connectOverCDP`) to
   fallback is needed. (Verified by attaching to the WebView2 over CDP.)
 - The overlay renders, the live-component badge populates, and the renderer-reflection tree works in
   the native MAUI runtime — confirmed live.
-- Picker is highlight-only here too. Note `correlationKind()` reports `unknown` in `BlazorWebView`
-  (vs `pointer` in WASM): BlazorWebView marshals render batches over IPC, so the JS hook never sees a
-  decodable batch. The click degrades gracefully with the same console note.
+- Picker click-to-select is **WASM-only**, so it is highlight-only here. The WASM decode reads render
+  batches through the WASM-runtime `Blazor.platform` memory reader; BlazorWebView runs on the native
+  runtime (no `Blazor.platform`, different batch marshaling), so `harvestBatch` finds no platform and
+  the picker degrades gracefully to highlight + a one-time console note. (Supporting MAUI would mean
+  decoding the WebView's serialized batch — a separate reader — and is a possible follow-up.)
 - If you force-rebuild the RCL's `wwwroot` JS, MAUI's incremental build may keep a stale copy — use
   `--no-incremental` on the SampleMaui build to refresh the bundled static asset.
 - Re-run `RuntimeInternalsTests` after any TFM bump — the reflected member names are version-specific.

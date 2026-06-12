@@ -43,13 +43,19 @@ project fills that gap. We are **not** copying its Chrome-extension approach —
 4. **Debug-only — gated on the *consumer's* build at runtime, NOT the library's `#if DEBUG`.** The
    implementation reflects over private framework internals, which IL trimming / WASM AOT can break in
    Release, so the overlay must stay dormant in a Release app. But the gate must be a **runtime check on
-   the consuming app's entry assembly** (`DebuggableAttribute.IsJITTrackingEnabled`), set into
-   `Options.Enabled` by `AddBlazorInspector()`. An `#if DEBUG` *inside this library* does NOT work for the
-   shipped product: a library's `#if DEBUG` is evaluated when the library is compiled — and the NuGet
-   package is built in Release — so it would strip the inspector out of the package and leave it
-   permanently dormant in every consumer. (This bit us: 0.1.x shipped dead from NuGet for exactly this
-   reason.) `#if DEBUG` is still fine in *tests/samples* and for code you never want in the package at
-   all. Never assume Release works.
+   the consuming app's assembly** (`DebuggableAttribute.IsJITTrackingEnabled`), set into
+   `Options.Enabled` by `AddBlazorInspector()`. The assembly checked is the **entry assembly, falling
+   back to the assembly that called `AddBlazorInspector`** — `Assembly.GetEntryAssembly()` returns null
+   on MAUI Android / iOS / Mac Catalyst (managed code is launched from native startup; dotnet/android#9960),
+   so without the calling-assembly fallback the inspector would be silently dormant in every Debug MAUI
+   mobile app. The `GetCallingAssembly` capture lives in each public overload (delegating would make the
+   caller this library itself), marked `[MethodImpl(MethodImplOptions.NoInlining)]`, with the call wrapped
+   in try/catch (net8 NativeAOT throws PlatformNotSupportedException). An `#if DEBUG` *inside this
+   library* does NOT work for the shipped product: a library's `#if DEBUG` is evaluated when the library
+   is compiled — and the NuGet package is built in Release — so it would strip the inspector out of the
+   package and leave it permanently dormant in every consumer. (This bit us: 0.1.x shipped dead from
+   NuGet for exactly this reason.) `#if DEBUG` is still fine in *tests/samples* and for code you never
+   want in the package at all. Never assume Release works.
 
 5. **Distributed as a Razor Class Library (RCL).** Referenced via project or NuGet by the developer's
    WASM and MAUI Hybrid apps. License: Apache-2.0 (match the ecosystem norm).
@@ -102,8 +108,9 @@ CLAUDE.md                         # this file (the build spec)
 
 All phases below are implemented and **verified live**: the xUnit/bUnit/source-generator suite passes
 on net8.0/net9.0/net10.0, and the overlay, tree, parameter/state inspection, expandable values, inline
-editing, picker highlight, and jump-to-code were exercised against the running WASM sample (via
-Playwright) and inside the MAUI BlazorWebView (via WebView2 CDP). What exists:
+editing, the picker (hover-highlight in both targets; **click-to-select on WASM**), and jump-to-code
+were exercised against the running WASM sample (via Playwright) and inside the MAUI BlazorWebView (via
+WebView2 CDP). What exists:
 
 - `InspectorRegistry` — weak-reference tracking; `Snapshot()` (flat) and `BuildTree()` (parent/child
   hierarchy from the renderer's `ComponentState` map); prunes dead refs.
@@ -206,12 +213,23 @@ sends the matched componentId back to .NET (`DotNet.invokeMethodAsync`) to selec
 Verify the JS initializer fires inside the MAUI BlazorWebView, not just in WASM; if it doesn't,
 fall back to registering the module via the host page for MAUI.
 
-**Status (verified):** the JS initializer *does* fire inside the MAUI BlazorWebView on .NET 10 — no
-host-page fallback needed. Hover-highlight works in both targets. **Click-to-select is not achievable
-on current Blazor WASM:** the runtime hands `renderBatch` an opaque WASM-memory pointer (not a readable
-batch object), so a DOM↔componentId map can't be built from JS — the picker ships **highlight-only** and
-logs a one-time note on click. The hook is installed in a `beforeStart` initializer (wrapping
-`renderBatch` in `afterStarted` is too late — the JSImport is already bound). See README "Limitations".
+**Status (verified live, WASM):** hover-highlight works in both targets, and **click-to-select now
+works on Blazor WASM**. The earlier "not achievable" conclusion was wrong about the *consequence*, not
+the premise: the runtime *does* hand `renderBatch` an opaque WASM-memory pointer — but the readable
+batch is recoverable. `Blazor._internal.renderBatch(rendererId, batchPtr)` is wrapped in a
+`beforeStart` initializer (an `afterStarted` wrap is too late — the JSImport is already bound). After
+the original applies the batch, we decode `batchPtr` through the **exposed `Blazor.platform`** memory
+reader — reconstructing the framework's `SharedMemoryRenderBatch` readers from fixed struct offsets
+(arrayRange 8 / segment 12 / diff 16 / edit 20 / frame 36; identical on .NET 8/9/10) — and re-walk the
+reference frames read-only (mirroring `BrowserRenderer.insertFrame`), indexing into Blazor's logical
+DOM tree to recover each component's host node. The logical tree is reachable because logical children
+(an Array) and logical parent (a Node) live on each DOM node under its own Symbols, enumerable via
+`Object.getOwnPropertySymbols`. Click walks up (logical parent, then DOM parent) to the nearest mapped
+host and sends its componentId to `InspectorInterop.OnPick`. The renderer's own componentId→node map
+(`childComponentLocations` on the closure-private `BrowserRenderer`) is *not* reachable — we rebuild an
+equivalent. Degrades to highlight-only (never throws) if the internals are absent. **MAUI Hybrid stays
+highlight-only:** the native runtime has no `Blazor.platform` and marshals batches differently; a
+separate decoder would be needed (possible follow-up). See README "Limitations".
 
 ### 3b. Jump-to-code (introduces a source generator)
 
@@ -283,8 +301,10 @@ Acceptance:
     runtime via the options `Enabled` flag instead. Compile-time `#if` is fine in `.cs` / `@code`.
 - The picker's render-batch hook must be installed **before** the runtime starts (a `beforeStart` JS
   initializer), not in `afterStarted` — by then the `renderBatch` JSImport is already bound and
-  wrapping it has no effect. (And on .NET 10 WASM the batch is an opaque pointer anyway, so DOM↔id
-  correlation isn't reachable from JS — the picker is highlight-only there; see README.)
+  wrapping it has no effect. (On WASM the batch arg is an opaque pointer, but it's decodable via the
+  exposed `Blazor.platform` + the logical-tree node Symbols — see Phase 3a status; that's how
+  click-to-select works. The struct offsets in `makeBatchReader` and the symbol-by-value-type
+  discovery in `ensureSymbols` are the version-fragile bits — the live WASM sample is their guard.)
 
 ---
 
