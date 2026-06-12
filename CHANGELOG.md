@@ -9,11 +9,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
-## [0.1.0] - 2026-06-07 — unlisted
+## [0.1.2] - 2026-06-12
 
-> **Unlisted on nuget.org.** This version was published before it was ready and has been pulled from
-> listings. nuget.org versions can't be deleted, so `0.1.0` is retained but hidden; the same
-> functionality is re-released as `0.1.1` (see `[Unreleased]`).
+The first release that actually works when installed from NuGet — `0.1.0`/`0.1.1` shipped dead (see
+**Fixed**) — and it adds picker click-to-select on WebAssembly.
+
+### Added
+
+- **Element picker click-to-select on Blazor WebAssembly.** Clicking an element in picker mode selects
+  its component in the tree (previously hover-highlight only). The earlier limitation held that the
+  render batch is an opaque WASM pointer with no JS-reachable path to DOM nodes — the pointer part is
+  true, but the path exists: the JS module decodes the batch through the exposed `Blazor.platform`
+  memory reader (struct offsets mirror the `RenderTree` layouts, identical on .NET 8/9/10) and walks
+  Blazor's logical-element tree via the DOM nodes' own Symbols to recover each component's host node.
+  No public-API or .NET-side changes; degrades to hover-highlight only if the internals are
+  unavailable. Verified live against the WASM sample with Playwright. **WASM only** — see *Known
+  limitations*.
+
+### Fixed
+
+- **The package no longer ships dead.** The Debug-only gate was a library-side `#if DEBUG`, which is
+  evaluated when *BlazorInspector itself* is compiled — and the package is built in Release — so the
+  published `0.1.1` had the tracking activator stripped out and the overlay forced off. Installed from
+  NuGet, it was a permanent no-op in every consumer (it only ever worked via a project reference). The
+  gate is now a **runtime check on the consuming app's** build — the entry assembly's
+  `DebuggableAttribute`, falling back to the assembly that calls `AddBlazorInspector` on MAUI
+  Android/iOS/Mac Catalyst, where `Assembly.GetEntryAssembly()` returns null — so installing the package
+  and running your app in Debug actually shows the inspector, on every supported platform.
+- A **Release consumer registers no component activator at all** (not merely a disabled one), so the
+  inspector adds zero per-component overhead and keeps no tracking list there.
+
+### Known limitations
+
+- Picker **click-to-select is Blazor WASM only**. MAUI Blazor Hybrid runs on the native runtime (no
+  `Blazor.platform` memory reader, different batch marshaling), so the picker there is hover-highlight
+  only — select the component from the tree instead. See the WASM-vs-MAUI matrix in the README.
+
+## [0.1.1] - 2026-06-07 — deprecated & unlisted
+
+> **Deprecated — do not use.** Unlisted on nuget.org. Non-functional when installed from NuGet: the
+> Debug-only gate was a library-side `#if DEBUG`, so the Release-compiled package shipped with the
+> inspector stripped out and it never activated in any consumer. This was a re-release of `0.1.0`'s
+> functionality but carried the same packaging defect. Use **`0.1.2`** or later (see `[0.1.2]`).
+
+## [0.1.0] - 2026-06-07 — deprecated & unlisted
+
+> **Deprecated — do not use.** Unlisted on nuget.org. Published before it was ready and pulled from
+> listings; nuget.org versions can't be deleted, so `0.1.0` is retained but hidden. Like `0.1.1`, it is
+> non-functional when installed from NuGet (the inspector was compiled out of the package). Use
+> **`0.1.2`** or later (see `[0.1.2]`).
 
 Initial release — an in-app, DevTools-style component inspector for Blazor WebAssembly and MAUI
 Blazor Hybrid. Debug-only; a no-op in Release.
@@ -53,4 +97,6 @@ Blazor Hybrid. Debug-only; a no-op in Release.
   Release builds.
 
 [Unreleased]: https://github.com/kobrien603/BlazorInspector/commits/main
+[0.1.2]: https://www.nuget.org/packages/BlazorInspector/0.1.2
+[0.1.1]: https://www.nuget.org/packages/BlazorInspector/0.1.1
 [0.1.0]: https://www.nuget.org/packages/BlazorInspector/0.1.0

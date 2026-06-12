@@ -18,13 +18,16 @@ component's `.razor` source in VS Code.
 
 > [!IMPORTANT]
 > **Debug-only by design.** The inspector reflects over private ASP.NET Core internals — fine for a
-> local debugging tool, but can be broken by IL trimming / WASM AOT. Everything is gated behind
-> `#if DEBUG` and is a **no-op in Release builds**. Don't ship it enabled.
+> local debugging tool, but can be broken by IL trimming / WASM AOT. It enables itself automatically
+> **only when your app is built in Debug** (detected at runtime) and is a **no-op when your app is built
+> in Release**, so it's safe to leave the registration and `<InspectorOverlay />` tag in place. Don't
+> force it on in Release.
 
 ## Table of contents
 
 - [Who it's for](#who-its-for)
 - [Features](#features)
+- [Platform support (WASM vs MAUI Hybrid)](#platform-support-wasm-vs-maui-hybrid)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quick start](#quick-start)
@@ -63,8 +66,8 @@ browser DevTools panel, and especially on **Server** or **InteractiveAuto** — 
 - **Inline editing** — edit writable scalar values in place (numbers, strings, bools, enums, `Guid`,
   dates/times), including values nested deep inside collections and objects. The change is written to
   the live object and the owning component re-renders, so your app's UI updates immediately.
-- **Element picker** — hover the page to highlight the element under the cursor (see
-  [limitations](#limitations--known-issues) for click-to-select).
+- **Element picker** — hover the page to highlight the element under the cursor, then click to select
+  its component in the tree (click-to-select on Blazor WASM; hover-highlight on MAUI Hybrid).
 - **Jump-to-code** — every component shows a `</> source` link that opens its `.razor` file at roughly
   the right line in VS Code (`vscode://file/...`).
 - **One codebase, both targets** — identical behavior in Blazor WASM (browser) and MAUI Blazor Hybrid
@@ -73,13 +76,49 @@ browser DevTools panel, and especially on **Server** or **InteractiveAuto** — 
   `Microsoft.AspNetCore.Components.Web`, and a public surface of just `AddBlazorInspector()`,
   `<InspectorOverlay />`, and the options type.
 
+## Platform support (WASM vs MAUI Hybrid)
+
+Everything works identically on both targets **except picker click-to-select**, which is WASM-only.
+
+| Capability | Blazor WASM | MAUI Blazor Hybrid |
+|---|:---:|:---:|
+| Live component tree (real parent/child hierarchy) | ✅ | ✅ |
+| Parameter & state inspection | ✅ | ✅ |
+| Expandable values (collections / dictionaries / objects) | ✅ | ✅ |
+| Inline editing of writable scalar values | ✅ | ✅ |
+| Jump-to-code (`</> source` → VS Code) | ✅ | ✅ |
+| Element picker — **hover highlight** | ✅ | ✅ |
+| Element picker — **click-to-select** | ✅ | ❌ — highlight only; select from the tree |
+| Auto-enable in Debug / no-op in Release | ✅ (entry assembly) | ✅ (calling-assembly fallback¹) |
+
+**Why click-to-select differs.** On WASM the runtime applies render batches in JavaScript, so the
+picker can decode each batch through the exposed `Blazor.platform` memory reader and walk Blazor's
+logical-element tree (via the DOM nodes' own Symbols) to map a clicked element to its component. MAUI
+Blazor Hybrid runs on the **native** runtime — there is no `Blazor.platform` and batches are marshaled
+to the WebView differently — so that path isn't available and the picker stays hover-highlight only.
+It degrades gracefully (never throws); you just select the component from the tree.
+
+**Applies to both targets:**
+- **Debug-only.** The inspector auto-enables in a Debug build of your app and is a complete no-op in
+  Release (no overlay, no component-tracking activator, no framework-internals reflection).
+- **Reflects private framework internals** (renderer component-state map; WASM batch/struct offsets in
+  the picker). These are centralized and documented per .NET version (verified 8.0 / 9.0 / 10.0); a
+  runtime that changes them degrades the affected feature rather than crashing.
+- **Editing a top-level `[Parameter]`** is reverted on the next parent re-render; state and nested
+  object/collection edits persist.
+- **Not for Blazor Server / InteractiveAuto** — see [Who it's for](#who-its-for).
+
+¹ On MAUI Android / iOS / Mac Catalyst `Assembly.GetEntryAssembly()` is null, so call
+`AddBlazorInspector()` from your **app** project (e.g. `MauiProgram.cs`), not a shared Release-built
+library — the calling assembly is the Debug/Release signal there.
+
 ## Requirements
 
 | | |
 |---|---|
 | **.NET** | 8.0, 9.0, or 10.0 (the RCL multi-targets `net8.0;net9.0;net10.0`) |
 | **Render modes** | Blazor WebAssembly, MAUI Blazor Hybrid |
-| **Build** | Debug only — the inspector compiles out / no-ops in Release |
+| **Build** | Debug only — auto-enables in a Debug build of your app, no-ops in Release |
 | **Runtime deps** | none beyond `Microsoft.AspNetCore.Components.Web` |
 
 ## Installation
@@ -90,6 +129,11 @@ Install the package into your Blazor WASM or MAUI Hybrid app:
 dotnet add package BlazorInspector
 ```
 
+> [!IMPORTANT]
+> Use **0.1.2 or later**. `0.1.0` and `0.1.1` are deprecated and unlisted — they were compiled out of
+> the package and do nothing when installed from NuGet (see [CHANGELOG](CHANGELOG.md)). If you pinned an
+> earlier version, bump it.
+
 > Working against the source instead of the published package? Add a `ProjectReference` to
 > `BlazorInspector/BlazorInspector.csproj` (and, for jump-to-code, the source generator as an
 > `Analyzer` reference — see [`samples/SampleWasm/SampleWasm.csproj`](samples/SampleWasm/SampleWasm.csproj)).
@@ -99,7 +143,8 @@ dotnet add package BlazorInspector
 Two lines of integration:
 
 ```csharp
-// Program.cs (WASM) or MauiProgram.cs (MAUI) — DEBUG-only, no-op in Release.
+// Program.cs (WASM) or MauiProgram.cs (MAUI). Auto-enables when your app is built in
+// Debug; a no-op when it's built in Release — no need to wrap this in your own #if DEBUG.
 builder.Services.AddBlazorInspector();
 ```
 
@@ -152,8 +197,8 @@ inheritance, falling back to the `RootNamespace` + folder convention. Links use 
   hierarchy comes from reflecting the renderer's `ComponentState` map.
 - **Jump-to-code** — a Roslyn `IIncrementalGenerator` emits a compile-time map of component type →
   `.razor` path/line into the consuming assembly, which the overlay reads via reflection.
-- **JavaScript** — used only for the element picker (hover highlight). All tree/parameter/edit
-  functionality is pure C#.
+- **JavaScript** — used only for the element picker (hover highlight + click-to-select). All
+  tree/parameter/edit functionality is pure C#.
 
 All reflection into framework internals is centralized in
 [`BlazorInspector/RuntimeInternals.cs`](BlazorInspector/RuntimeInternals.cs) behind named constants,
@@ -164,13 +209,29 @@ re-run the test suite when bumping the target framework.
 ## Limitations & known issues
 
 - **Debug-only / Release no-op.** Trimming and WASM AOT can strip the reflected members, so the
-  inspector is intentionally disabled in Release. Don't rely on it there.
-- **Element picker is highlight-only on current Blazor WASM.** Click-to-select needs to map a DOM node
-  to a Blazor component id; the only JS seam for that is the render batch, but on .NET 10 WASM the
-  runtime passes the batch as an opaque pointer into WASM memory, with no JS-reachable path from a
-  component's render tree to its DOM nodes. Hover-highlight works; clicking logs a one-time note and
-  you select from the tree instead. (`window.blazorInspector.correlationKind()` reports the runtime's
-  batch shape; the correlation seam auto-populates on any runtime that exposes a readable batch.)
+  inspector disables itself when your app is built in Release — detected at runtime from your app
+  assembly's `DebuggableAttribute` (the entry assembly, falling back to the assembly that calls
+  `AddBlazorInspector`, since on MAUI Android/iOS/Mac Catalyst there is no managed entry assembly).
+  Don't rely on it there. (The gate is a runtime check on *your* app's build, not a compile-time
+  `#if DEBUG` in the package — the latter would be baked in when the package is compiled and could
+  never react to how you build your app.) Two caveats, both solvable with an explicit
+  `AddBlazorInspector(o => o.Enabled = true)`:
+  - A build with `<DebugType>none</DebugType>` emits no `DebuggableAttribute`, so it is detected as
+    Release and the inspector stays off.
+  - On MAUI Android/iOS, call `AddBlazorInspector` directly from your app project (the usual
+    `MauiProgram.cs`), not from a shared startup library — the calling assembly is the detection
+    signal there, and a Release-built helper library would read as Release.
+- **Element picker click-to-select is Blazor WASM only and relies on framework internals.** Mapping a
+  clicked DOM node to a component id is done entirely in JS: the picker decodes each render batch (a
+  raw WASM-memory pointer) through the exposed `Blazor.platform` reader using struct offsets that
+  mirror the `RenderTree` layouts (verified on .NET 8/9/10), then walks Blazor's logical-element tree —
+  reachable via the nodes' own Symbols — to recover each component's host node. It degrades to
+  **hover-highlight only** (never throws) when those internals are absent — notably on **MAUI Blazor
+  Hybrid**, which runs on the native runtime with no `Blazor.platform` and a different batch
+  marshaling, so the picker there highlights and you select from the tree. One WASM edge case: a single
+  render that *simultaneously* inserts and reorders sibling components in the same diff can briefly
+  mis-map until the next render; the common cases (mount/unmount, nested components, state updates) are
+  exact.
 - **Editing a top-level `[Parameter]` is temporary.** It's reverted the next time the parent
   re-renders and re-supplies the parameter. Editing **state** and **nested** object/collection values
   persists.
