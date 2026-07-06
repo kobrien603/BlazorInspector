@@ -28,7 +28,24 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
-    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js" autostart="false"></script>
+    <script>
+        // Manual start so we can disable subresource-integrity (SRI) checking on boot resources.
+        // When hosted on GitHub Pages, the Fastly CDN can intermittently serve bytes for a .wasm
+        // that don't match the boot manifest's SHA-256 hash, and the browser then hard-blocks
+        // startup with "Failed to find a valid digest in the 'integrity' attribute … blocked".
+        // Omitting the `integrity` option from the fetch below disables that check (per the .NET
+        // docs' loadBootResource guidance); `cache: 'no-cache'` forces revalidation so a corrupt
+        // cached copy isn't reused. Acceptable for a public demo — do not do this in production.
+        Blazor.start({
+            loadBootResource: function (type, name, defaultUri, integrity) {
+                if (type === 'dotnetjs') {
+                    return null; // dotnetjs must return null (default load) or a URI string
+                }
+                return fetch(defaultUri, { cache: 'no-cache' });
+            }
+        });
+    </script>
 </body>
 
 </html>
