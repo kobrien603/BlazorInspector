@@ -1,0 +1,62 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; cancel in-progress runs for new pushes.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Publish in Debug so the inspector's runtime gate (DebuggableAttribute) self-enables.
+      # A Release publish would leave the overlay dormant (by design) and the demo would show nothing.
+      # PublishTrimmed=false: Blazor WASM `publish` trims even in Debug, which can strip the private
+      # framework internals the inspector reflects over. Keep the assemblies whole so the demo works.
+      - name: Publish SampleWasm (Debug, untrimmed)
+        run: >
+          dotnet publish samples/SampleWasm/SampleWasm.csproj
+          -c Debug -p:PublishTrimmed=false -o publish
+
+      - name: Rewrite base href for project pages + SPA 404 fallback
+        run: |
+          sed -i 's|<base href="/" />|<base href="/BlazorInspector/" />|g' publish/wwwroot/index.html
+          cp publish/wwwroot/index.html publish/wwwroot/404.html
+          touch publish/wwwroot/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: publish/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

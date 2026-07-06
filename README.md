@@ -1,6 +1,7 @@
 # BlazorInspector
 
 [![CI](https://github.com/kobrien603/BlazorInspector/actions/workflows/ci.yml/badge.svg)](https://github.com/kobrien603/BlazorInspector/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/live%20demo-online-2ea043?logo=blazor&logoColor=white)](https://kobrien603.github.io/BlazorInspector/)
 [![NuGet](https://img.shields.io/nuget/v/BlazorInspector.svg?logo=nuget)](https://www.nuget.org/packages/BlazorInspector)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-512BD4)](#requirements)
@@ -14,6 +15,8 @@ Open a floating panel inside your running app to browse the live component tree,
 each component's parameters and state, hover the page to highlight elements, and jump straight to a
 component's `.razor` source in VS Code.
 
+🔗 **Try it live:** [kobrien603.github.io/BlazorInspector](https://kobrien603.github.io/BlazorInspector/) — a hosted Blazor WASM sample with the inspector already wired in. Click the floating button (bottom corner) to open the panel.
+
 ![BlazorInspector demo — opening the panel, expanding the component tree, drilling into a collection, and editing a value live so the page updates instantly](docs/demo.gif)
 
 > [!IMPORTANT]
@@ -21,10 +24,12 @@ component's `.razor` source in VS Code.
 > local debugging tool, but can be broken by IL trimming / WASM AOT. It enables itself automatically
 > **only when your app is built in Debug** (detected at runtime) and is a **no-op when your app is built
 > in Release**, so it's safe to leave the registration and `<InspectorOverlay />` tag in place. Don't
-> force it on in Release.
+> force it on in Release. (The [live demo](https://kobrien603.github.io/BlazorInspector/) is simply
+> published in Debug — nothing is forced — which is why the overlay is active there.)
 
 ## Table of contents
 
+- [Live demo](https://kobrien603.github.io/BlazorInspector/)
 - [Who it's for](#who-its-for)
 - [Features](#features)
 - [Platform support (WASM vs MAUI Hybrid)](#platform-support-wasm-vs-maui-hybrid)
