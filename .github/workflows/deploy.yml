@@ -34,10 +34,15 @@ jobs:
       # A Release publish would leave the overlay dormant (by design) and the demo would show nothing.
       # PublishTrimmed=false: Blazor WASM `publish` trims even in Debug, which can strip the private
       # framework internals the inspector reflects over. Keep the assemblies whole so the demo works.
-      - name: Publish SampleWasm (Debug, untrimmed)
+      # WasmFingerprintAssets=false: removes the boot manifest's per-assembly SHA-256 integrity hashes.
+      # GitHub Pages / the Fastly CDN can intermittently serve bytes that don't match those hashes,
+      # which makes the browser hard-block boot with "Failed to find a valid digest in the 'integrity'
+      # attribute" (seen live on a .wasm assembly). Disabling integrity is the sanctioned escape hatch
+      # for a host that can't guarantee byte-identical responses; fine for a public demo.
+      - name: Publish SampleWasm (Debug, untrimmed, no integrity)
         run: >
           dotnet publish samples/SampleWasm/SampleWasm.csproj
-          -c Debug -p:PublishTrimmed=false -o publish
+          -c Debug -p:PublishTrimmed=false -p:WasmFingerprintAssets=false -o publish
 
       - name: Rewrite base href for project pages + SPA 404 fallback
         run: |
